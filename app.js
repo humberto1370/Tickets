@@ -1,16 +1,13 @@
-// Importamos las herramientas necesarias de Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
     getFirestore,
     collection,
     addDoc,
-    getDocs,
     onSnapshot,
     doc,
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// ESTE ES TU CONFIG (El que pegaste antes)
 const firebaseConfig = {
     apiKey: "AIzaSyAp_lb8Y2-RyPF4J5ez6soq-54WlQE-Fbg",
     authDomain: "crud-ticket-e86bc.firebaseapp.com",
@@ -22,14 +19,13 @@ const firebaseConfig = {
     measurementId: "G-41F40E1ER1"
 };
 
-// Inicializamos Firebase y la Base de Datos (Firestore)
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- FUNCIONES CRUD ---
+// --- FUNCIONES ---
 
 // 1. CREAR PRODUCTO
-window.crearProducto = async () => {
+const crearProducto = async () => {
     const nombre = document.getElementById('prodNombre').value;
     const precio = document.getElementById('prodPrecio').value;
 
@@ -48,7 +44,7 @@ window.crearProducto = async () => {
     }
 };
 
-// 2. LEER PRODUCTOS (Para llenar el selector de ventas automáticamente)
+// 2. LEER PRODUCTOS
 onSnapshot(collection(db, "productos"), (snapshot) => {
     const select = document.getElementById('selectProducto');
     select.innerHTML = '<option value="">-- Selecciona un producto --</option>';
@@ -58,21 +54,19 @@ onSnapshot(collection(db, "productos"), (snapshot) => {
     });
 });
 
-// 3. CREAR VENTA (Relación Ventas -> Productos)
-window.generarVenta = async () => {
+// 3. CREAR VENTA
+const generarVenta = async () => {
     const productoId = document.getElementById('selectProducto').value;
     const cantidad = document.getElementById('cantidad').value;
 
     if(!productoId || !cantidad) return alert("Selecciona producto y cantidad");
 
     try {
-        // Creamos el ticket de venta principal
         const ventaRef = await addDoc(collection(db, "ventas"), {
             fecha: new Date(),
-                                      cliente: "Mostrador" // Podrías añadir un input para el nombre del cliente
+            cliente: "Mostrador"
         });
 
-        // Creamos la relación en la tabla Ventas_Productos
         await addDoc(collection(db, "ventas_productos"), {
             idVenta: ventaRef.id,
             idProducto: productoId,
@@ -91,19 +85,40 @@ onSnapshot(collection(db, "ventas"), (snapshot) => {
     contenedor.innerHTML = "";
     snapshot.forEach(documento => {
         const data = documento.data();
-        contenedor.innerHTML += `
-        <div style="border: 1px solid #ccc; margin: 5px; padding: 10px;">
-        <p><strong>Ticket ID:</strong> ${documento.id}</p>
-        <p>Fecha: ${data.fecha.toDate().toLocaleString()}</p>
-        <button onclick="eliminarVenta('${documento.id}')">Eliminar Ticket</button>
-        </div>
+        // Evitamos error si la fecha aún no carga de Firebase
+        const fechaFormateada = data.fecha?.toDate ? data.fecha.toDate().toLocaleString() : "Cargando...";
+        
+        const divTicket = document.createElement('div');
+        divTicket.className = 'ticket';
+        divTicket.innerHTML = `
+            <div class="ticket-info">
+                <p><strong>Ticket ID:</strong> ${documento.id}</p>
+                <p>Fecha: ${fechaFormateada}</p>
+            </div>
+            <button class="btn-danger" data-id="${documento.id}">Eliminar</button>
         `;
+
+        // Añadimos evento al botón de eliminar de este ticket específico
+        divTicket.querySelector('.btn-danger').addEventListener('click', (e) => {
+            const id = e.target.getAttribute('data-id');
+            eliminarVenta(id);
+        });
+
+        contenedor.appendChild(divTicket);
     });
 });
 
 // 5. ELIMINAR VENTA
-window.eliminarVenta = async (id) => {
+const eliminarVenta = async (id) => {
     if(confirm("¿Seguro que quieres borrar este ticket?")) {
-        await deleteDoc(doc(db, "ventas", id));
+        try {
+            await deleteDoc(doc(db, "ventas", id));
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+        }
     }
 };
+
+// ASIGNAR EVENTOS A LOS BOTONES PRINCIPALES
+document.getElementById('btnGuardarProducto').addEventListener('click', crearProducto);
+document.getElementById('btnFinalizarVenta').addEventListener('click', generarVenta);
